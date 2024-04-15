@@ -1,6 +1,6 @@
 {
     "name": "dainis/auth-handler",
-    "description": "A simple authentication and JWT handling library for PHP applications.",
+    "description": "A library for JWT handling and authentication service interaction",
     "type": "library",
     "license": "MIT",
     "authors": [
