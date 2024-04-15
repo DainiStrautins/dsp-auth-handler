@@ -1,0 +1,21 @@
+{
+    "name": "dainis/auth-handler",
+    "description": "A simple authentication and JWT handling library for PHP applications.",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Dainis Strautiņš",
+            "email": "strautinsdainis@gmail.com"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "Dainis\\AuthHandler\\": "src/"
+        }
+    },
+    "require": {
+        "firebase/php-jwt": "^6.10",
+        "guzzlehttp/guzzle": "^7.8"
+    }
+}
