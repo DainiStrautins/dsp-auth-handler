@@ -15,12 +15,12 @@ class AuthHandler
         $this->httpClient = new Client();
     }
 
-    public function fetchApplicationData($accessToken)
+    public function fetchApplicationData($bearer)
     {
         try {
             $response = $this->httpClient->request('GET', $this->authServiceEndpoint, [
                 'headers' => [
-                    'Authorization' => 'Bearer ' . $accessToken
+                    'Authorization' => 'Bearer ' . $bearer
                 ]
             ]);
 

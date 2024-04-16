@@ -2,8 +2,10 @@
 
 namespace Dainis\AuthHandler;
 
+use Firebase\JWT\ExpiredException;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
+use Firebase\JWT\SignatureInvalidException;
 
 class JWTService
 {
@@ -18,14 +20,20 @@ class JWTService
     {
         try {
             // Decoding the JWT with the provided public key
-            $decoded = JWT::decode($jwt, new Key($this->publicKey, 'RS256'));
+            try {
+                $decoded = JWT::decode($jwt, new Key($this->publicKey, 'RS256'));
 
-            // Check if the token is expired
-            if ($decoded->exp < time()) {
+                if ($decoded->exp < time()) {
+                    throw new \Exception("Token has expired.");
+                }
+                return $decoded;
+            } catch (ExpiredException $e) {
                 throw new \Exception("Token has expired.");
+            } catch (SignatureInvalidException $e) {
+                throw new \Exception("Invalid signature.");
+            } catch (\Exception $e) {
+                throw new \Exception("JWT validation error: " . $e->getMessage());
             }
-
-            return $decoded;
         } catch (\Exception $e) {
             throw new \Exception("Invalid token: " . $e->getMessage());
         }
