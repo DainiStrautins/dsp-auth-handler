@@ -11,7 +11,9 @@
     ],
     "autoload": {
         "psr-4": {
-            "Dainis\\AuthHandler\\": "src/"
+            "Dainis\\AuthHandler\\": "src/",
+            "Dainis\\AuthHandler\\Exceptions\\TokenExpiredException": "src/Exceptions",
+            "Dainis\\AuthHandler\\Interfaces\\": "src/Interfaces"
         }
     },
     "require": {
