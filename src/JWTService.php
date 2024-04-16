@@ -2,40 +2,34 @@
 
 namespace Dainis\AuthHandler;
 
-use Firebase\JWT\ExpiredException;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key;
-use Firebase\JWT\SignatureInvalidException;
 
 class JWTService
 {
-    private $publicKey;
+    private $secretKey;
 
-    public function __construct($publicKey)
+    public function __construct($secretKey)
     {
-        $this->publicKey = $publicKey;
+        $this->secretKey = $secretKey;
     }
 
     public function validateToken($jwt)
     {
         try {
-            // Decoding the JWT with the provided public key
-            try {
-                $decoded = JWT::decode($jwt, new Key($this->publicKey, 'RS256'));
-
-                if ($decoded->exp < time()) {
-                    throw new \Exception("Token has expired.");
-                }
-                return $decoded;
-            } catch (ExpiredException $e) {
-                throw new \Exception("Token has expired.");
-            } catch (SignatureInvalidException $e) {
-                throw new \Exception("Invalid signature.");
-            } catch (\Exception $e) {
-                throw new \Exception("JWT validation error: " . $e->getMessage());
-            }
+            // Decoding the JWT with the provided secret key
+            $decoded = JWT::decode($jwt, new Key($this->secretKey, 'HS256'));
+            return $decoded;
+        } catch (\Firebase\JWT\ExpiredException $e) {
+            throw new \Exception("Token has expired: " . $e->getMessage());
+        } catch (\Firebase\JWT\SignatureInvalidException $e) {
+            throw new \Exception("Invalid signature: " . $e->getMessage());
+        } catch (\Firebase\JWT\BeforeValidException $e) {
+            throw new \Exception("Token is not yet valid: " . $e->getMessage());
+        } catch (\UnexpectedValueException $e) {
+            throw new \Exception("JWT validation error: " . $e->getMessage());
         } catch (\Exception $e) {
-            throw new \Exception("Invalid token: " . $e->getMessage());
+            throw new \Exception("Error decoding token: " . $e->getMessage());
         }
     }
 }
