@@ -100,10 +100,16 @@ class AuthClient
                     $options['headers'] = ['Authorization' => 'Bearer ' . $this->config['bearer_token']];
                 }
                 $response = $this->httpClient->get($url, $options);
+
+                // Check response status
+                if ($response->getStatusCode() != 200) {
+                    throw new \Exception("HTTP error " . $response->getStatusCode() . " received from " . $url);
+                }
+
                 $data = json_decode($response->getBody()->getContents(), true, 512, JSON_THROW_ON_ERROR);
                 return $data['key'] ?? null;
             } catch (GuzzleException $e) {
-                throw new \Exception('Failed to retrieve key from remote server.', 0, $e);
+                throw new \Exception("Failed to retrieve key from remote server. URL: " . $url . " Error: " . $e->getMessage(), 0, $e);
             }
         }
 
