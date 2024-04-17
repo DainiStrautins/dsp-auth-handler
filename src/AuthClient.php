@@ -94,7 +94,12 @@ class AuthClient
         if ($this->config['use_remote_key_retrieval']) {
             try {
                 $url = $this->config['remote_server_url'] . '/' . $kid;
-                $response = $this->httpClient->get($url);
+
+                $options = [];
+                if (!empty($this->config['bearer_token'])) {
+                    $options['headers'] = ['Authorization' => 'Bearer ' . $this->config['bearer_token']];
+                }
+                $response = $this->httpClient->get($url, $options);
                 $data = json_decode($response->getBody()->getContents(), true, 512, JSON_THROW_ON_ERROR);
                 return $data['key'] ?? null;
             } catch (GuzzleException $e) {
