@@ -24,7 +24,7 @@ class AuthClient
      * @throws JsonException
      * @throws Exception
      */
-    private function verifyToken(string $jwtToken): object
+    public function verifyToken(string $jwtToken): object
     {
         $payload = $this->getPayloadFromToken($jwtToken);
         $this->validateTokenExpiration($payload);
