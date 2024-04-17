@@ -93,7 +93,7 @@ class AuthClient
         // If not found locally, retrieve from remote server
         if ($this->config['use_remote_key_retrieval']) {
             try {
-                $url = rtrim($this->config['remote_server_url'], '/') . urlencode($kid);
+                $url = rtrim($this->config['remote_server_url'], '/') . '/' . urlencode($kid);
 
                 $options = [];
                 if (!empty($this->config['bearer_token'])) {
