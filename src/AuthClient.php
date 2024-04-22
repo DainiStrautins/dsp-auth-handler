@@ -35,8 +35,9 @@ class AuthClient
         try {
             $this->processJwt($jwtToken);
             $this->isJwtValid = true;
-        } catch (Exception) {
+        } catch (Exception $e) {
             $this->isJwtValid = false;
+            $this->lastError = $e->getMessage(); // Correctly save the exception message inside the catch block
         }
     }
 
@@ -92,28 +93,73 @@ class AuthClient
             $this->key = file_get_contents($filePath);
         } else if ($this->useRemoteKeyRetrieval) {
             $url = $this->remoteServerUrl . '/' . urlencode($this->kid);
-            $options = ['headers' => ['Authorization' => 'Bearer ' . $this->jwtToken]];
-            $response = $this->httpClient->get($url, $options);
-            if ($response->getStatusCode() != 200) {
-                throw new Exception("HTTP error " . $response->getStatusCode() . " received from " . $url);
+            $headers = ['Authorization' => 'Bearer ' . $this->jwtToken];
+
+            try {
+                $response = $this->getWithFallback($url, $headers);
+                if ($response['status'] != 200) {
+                    throw new Exception("HTTP error " . $response['status'] . " received from " . $url);
+                }
+
+                $data = json_decode($response['body'], true, 512, JSON_THROW_ON_ERROR);
+                $this->key = $data['key'] ?? throw new Exception('Key not found in remote server response.');$this->key = $data['key'] ?? throw new Exception('Key not found in remote server response.');
+
+                $computedKid = hash('sha256', $this->key);
+                if ($computedKid !== $this->kid) {
+                    throw new Exception('Public key mismatch.');
+                }
+
+                file_put_contents($filePath, $this->key);
+            }catch (GuzzleException $e) {
+                throw new Exception('Network error during key retrieval: ' . $e->getMessage());
             }
-
-            $data = json_decode($response->getBody()->getContents(), true, 512, JSON_THROW_ON_ERROR);
-            $this->key = $data['key'] ?? throw new Exception('Key not found in remote server response.');
-
-            $computedKid = hash('sha256', $this->key);
-            if ($computedKid !== $this->kid) {
-                throw new Exception('Public key mismatch.');
-            }
-
-            file_put_contents($filePath, $this->key);
         } else {
-            throw new Exception('Key could not be retrieved.');
+            throw new Exception('Key could not be retrieved locally and remote retrieval is not configured.');
         }
+
 
         if (!$this->key) {
             throw new Exception('No key available to verify JWT.');
         }
         JWT::decode($this->jwtToken, new JWTKey($this->key, 'RS256'));
+    }
+    private function getWithFallback($url, $headers): array
+    {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HEADER, false);
+
+        $httpHeaders = array_map(function ($k, $v) { return "$k: $v"; }, array_keys($headers), $headers);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, $httpHeaders);
+
+        curl_setopt($ch, CURLOPT_URL, $url);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+        if (!$response || $httpCode != 200) {
+            if (isset($this->config['remote_server_ip'])) {
+                $parsedUrl = parse_url($url);
+                $originalHost = $parsedUrl['host'];
+                $fallbackUrl = str_replace($originalHost, $this->config['remote_server_ip'], $url);
+                $httpHeaders[] = "Host: $originalHost";
+                curl_setopt($ch, CURLOPT_HTTPHEADER, $httpHeaders);
+                curl_setopt($ch, CURLOPT_URL, $fallbackUrl);
+
+                $response = curl_exec($ch);
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            }
+            if (!$response || $httpCode != 200) {
+                curl_close($ch);
+                throw new Exception('Failed to retrieve key using fallback IP or original URL. HTTP Code: ' . $httpCode . '. Error: ' . curl_error($ch));
+            }
+        }
+
+        curl_close($ch);
+        return ['body' => $response, 'status' => $httpCode];
+    }
+
+    public function getLastErrorMessage(): string
+    {
+        return $this->lastError ?? 'No error';
     }
 }
