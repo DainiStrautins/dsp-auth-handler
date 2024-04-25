@@ -6,6 +6,7 @@ use Exception;
 use Firebase\JWT\JWT;
 use Firebase\JWT\Key as JWTKey;
 use GuzzleHttp\Client;
+use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Exception\GuzzleException;
 
 class AuthClient
@@ -16,6 +17,7 @@ class AuthClient
     private string $remoteServerUrl;
     private bool $useRemoteKeyRetrieval;
     private ?string $jwtToken = null;
+    private array $jwtPartsEncoded = [];
     private array $jwtParts = [];
     private bool $isJwtValid = false;
     private ?string $key = null;
@@ -66,15 +68,20 @@ class AuthClient
             $this->jwtToken = $jwtToken;
         }
 
-
         $parts = explode('.', $this->jwtToken);
         if (count($parts) !== 3) {
             throw new Exception('Malformed JWT.');
         }
-        $this->jwtParts = [
-            'header' => json_decode(base64_decode($parts[0]), true),
-            'payload' => json_decode(base64_decode($parts[1]), true),
+        $this->jwtPartsEncoded = [
+            'header' => $parts[0],
+            'payload' => $parts[1],
             'signature' => $parts[2]
+        ];
+
+        $this->jwtParts = [
+            'header' => json_decode(base64_decode(str_replace(['-', '_'], ['+', '/'], $this->jwtPartsEncoded['header'])), true),
+            'payload' => json_decode(base64_decode(str_replace(['-', '_'], ['+', '/'], $this->jwtPartsEncoded['payload'])), true),
+            'signature' => $this->jwtPartsEncoded['signature']
         ];
 
         $this->kid = $this->jwtParts['header']['kid'] ?? throw new Exception('JWT "kid" is missing in the header.');
@@ -91,6 +98,7 @@ class AuthClient
         $filePath = $this->keysDirectory . DIRECTORY_SEPARATOR . $this->kid;
         if (is_readable($filePath)) {
             $this->key = file_get_contents($filePath);
+            $this->verifyJwtSignature();
         } else if ($this->useRemoteKeyRetrieval) {
             $url = $this->remoteServerUrl . '/' . urlencode($this->kid);
             $headers = ['Authorization' => 'Bearer ' . $this->jwtToken];
@@ -108,6 +116,7 @@ class AuthClient
                 if ($computedKid !== $this->kid) {
                     throw new Exception('Public key mismatch.');
                 }
+                $this->verifyJwtSignature();
 
                 file_put_contents($filePath, $this->key);
             }catch (GuzzleException $e) {
@@ -123,8 +132,7 @@ class AuthClient
         }
         JWT::decode($this->jwtToken, new JWTKey($this->key, 'RS256'));
     }
-    private function getWithFallback($url, $headers): array
-    {
+    private function getWithFallback($url, $headers) {
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_HEADER, false);
@@ -157,7 +165,21 @@ class AuthClient
         curl_close($ch);
         return ['body' => $response, 'status' => $httpCode];
     }
+    private function verifyJwtSignature(): void
+    {
+        $data = $this->jwtPartsEncoded['header'] . '.' . $this->jwtPartsEncoded['payload'];
+        $signature = base64_decode(str_replace(['-', '_'], ['+', '/'], $this->jwtPartsEncoded['signature']));
 
+        if (!str_starts_with($this->key, '-----BEGIN PUBLIC KEY-----')) {
+            $publicKey = "-----BEGIN PUBLIC KEY-----\n" . chunk_split($this->key, 64, "\n") . "-----END PUBLIC KEY-----\n";
+        } else {
+            $publicKey = $this->key;
+        }
+
+        if (openssl_verify($data, $signature, $publicKey, OPENSSL_ALGO_SHA256) !== 1) {
+            throw new Exception('Invalid JWT signature.');
+        }
+    }
     public function getLastErrorMessage(): string
     {
         return $this->lastError ?? 'No error';
