@@ -37,9 +37,9 @@ class AuthClient
         $this->useRemoteKeyRetrieval = $config['use_remote_key_retrieval'] ?? false;
         $this->protectedResources = $config['protected_resources'] ?? [];
 
-        if (($config['auto_handle_jwt'] ?? false) === true) {
-            $this->isJwtValid = true;
-        } else {
+        $this->isJwtValid = $config['auto_handle_jwt'] ?? false;
+
+        if (!$this->isJwtValid && $jwtToken) {
             try {
                 $this->processJwt($jwtToken);
             } catch (Exception $e) {
@@ -63,15 +63,10 @@ class AuthClient
      */
     private function processJwt(?string $jwtToken = null): void
     {
-        if ($this->config['auto_handle_jwt'] === true) {
-            $this->isJwtValid = true;
-            return;
-        }
-
         $requestedResource = $_SERVER['REQUEST_URI'];
         $isProtected = !in_array($requestedResource, $this->config['protected_resources']['unprotected'] ?? []);
+
         if (!$isProtected) {
-            $this->isJwtValid = true;
             return;
         }
 
