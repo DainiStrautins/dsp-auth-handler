@@ -23,6 +23,8 @@ class AuthClient
     private ?string $key = null;
     private ?string $kid = null;
 
+    private array $protectedResources = [];
+
     /**
      * @throws GuzzleException
      */
@@ -33,13 +35,16 @@ class AuthClient
         $this->keysDirectory = rtrim($config['keys_directory'], DIRECTORY_SEPARATOR);
         $this->remoteServerUrl = rtrim($config['remote_server_url'], '/');
         $this->useRemoteKeyRetrieval = $config['use_remote_key_retrieval'] ?? false;
+        $this->protectedResources = $config['protected_resources'] ?? [];
 
-        try {
-            $this->processJwt($jwtToken);
-            $this->isJwtValid = true;
-        } catch (Exception $e) {
-            $this->isJwtValid = false;
-            $this->lastError = $e->getMessage(); // Correctly save the exception message inside the catch block
+        if ($config['auto_handle_jwt'] ?? false) {
+            try {
+                $this->processJwt($jwtToken);
+                $this->isJwtValid = true;
+            } catch (Exception $e) {
+                $this->isJwtValid = false;
+                $this->lastError = $e->getMessage();
+            }
         }
     }
 
@@ -57,11 +62,21 @@ class AuthClient
      */
     private function processJwt(?string $jwtToken = null): void
     {
+        $requestedResource = $_SERVER['REQUEST_URI'];
+        $isProtected = !in_array($requestedResource, $this->config['protected_resources']['unprotected'] ?? []);
+        if (!$isProtected) {
+            return;
+        }
         if ($jwtToken === null) {
             $headers = getallheaders();
             if (!empty($headers['Authorization']) && preg_match('/Bearer\s(\S+)/', $headers['Authorization'], $matches)) {
                 $this->jwtToken = $matches[1];
-            } else {
+            }  elseif (!empty($_COOKIE['jwt'])) {
+                $this->jwtToken = $_COOKIE['jwt'];
+            } elseif (!empty($_GET['token'])) {
+                $this->jwtToken = $_GET['token'];
+            }
+            else {
                 throw new Exception('JWT token not found in the headers.');
             }
         } else {
