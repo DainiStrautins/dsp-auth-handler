@@ -38,9 +38,10 @@ class AuthClient
         $this->protectedResources = $config['protected_resources'] ?? [];
 
         if ($config['auto_handle_jwt'] ?? false) {
+            $this->isJwtValid = true;
+        } else {
             try {
                 $this->processJwt($jwtToken);
-                $this->isJwtValid = true;
             } catch (Exception $e) {
                 $this->isJwtValid = false;
                 $this->lastError = $e->getMessage();
@@ -62,9 +63,15 @@ class AuthClient
      */
     private function processJwt(?string $jwtToken = null): void
     {
+        if ($this->config['auto_handle_jwt']) {
+            $this->isJwtValid = true;
+            return;
+        }
+
         $requestedResource = $_SERVER['REQUEST_URI'];
         $isProtected = !in_array($requestedResource, $this->config['protected_resources']['unprotected'] ?? []);
         if (!$isProtected) {
+            $this->isJwtValid = true;
             return;
         }
         if ($jwtToken === null) {
@@ -73,8 +80,8 @@ class AuthClient
                 $this->jwtToken = $matches[1];
             }  elseif (!empty($_COOKIE['jwt'])) {
                 $this->jwtToken = $_COOKIE['jwt'];
-            } elseif (!empty($_GET['token'])) {
-                $this->jwtToken = $_GET['token'];
+            } elseif (!empty($_GET['jwt'])) {
+                $this->jwtToken = $_GET['jwt'];
             }
             else {
                 throw new Exception('JWT token not found in the headers.');
