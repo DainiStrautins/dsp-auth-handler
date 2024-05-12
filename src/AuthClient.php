@@ -23,7 +23,7 @@ class AuthClient
     private ?string $key = null;
     private ?string $kid = null;
 
-    private array $protectedResources = [];
+    private ?array $protectedResources = [];
 
     /**
      * @throws GuzzleException
@@ -37,7 +37,7 @@ class AuthClient
         $this->useRemoteKeyRetrieval = $config['use_remote_key_retrieval'] ?? false;
         $this->protectedResources = $config['protected_resources'] ?? [];
 
-        if ($config['auto_handle_jwt'] ?? false) {
+        if (($config['auto_handle_jwt'] ?? false) === true) {
             $this->isJwtValid = true;
         } else {
             try {
@@ -63,7 +63,7 @@ class AuthClient
      */
     private function processJwt(?string $jwtToken = null): void
     {
-        if ($this->config['auto_handle_jwt']) {
+        if ($this->config['auto_handle_jwt'] === true) {
             $this->isJwtValid = true;
             return;
         }
@@ -74,6 +74,7 @@ class AuthClient
             $this->isJwtValid = true;
             return;
         }
+
         if ($jwtToken === null) {
             $headers = getallheaders();
             if (!empty($headers['Authorization']) && preg_match('/Bearer\s(\S+)/', $headers['Authorization'], $matches)) {
