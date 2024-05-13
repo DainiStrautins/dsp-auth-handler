@@ -36,18 +36,21 @@ class AuthClient
         $this->remoteServerUrl = rtrim($config['remote_server_url'], '/');
         $this->useRemoteKeyRetrieval = $config['use_remote_key_retrieval'] ?? false;
         $this->protectedResources = $config['protected_resources'] ?? [];
+        $autoAuthenticate = $config['auto_authenticate'] ?? false;
 
-        $this->isJwtValid = $config['auto_handle_jwt'] ?? false;
-
-        if (!$this->isJwtValid && $jwtToken) {
+        if ($autoAuthenticate) {
+            $this->isJwtValid = true;
+        } else {
             try {
                 $this->processJwt($jwtToken);
+                $this->isJwtValid = true;
             } catch (Exception $e) {
                 $this->isJwtValid = false;
                 $this->lastError = $e->getMessage();
             }
         }
     }
+
 
     public function isJwtValid(): bool
     {
